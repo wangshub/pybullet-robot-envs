@@ -111,3 +111,6 @@ venv.bak/
 .mypy_cache/
 .DS_Store
 *.local
+
+# Pycharm
+.idea/
