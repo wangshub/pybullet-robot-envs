@@ -8,14 +8,14 @@ print(parentdir)
 
 from stable_baselines import HER, DQN, SAC, DDPG
 from stable_baselines.her import GoalSelectionStrategy, HERGoalEnvWrapper
-from envs.panda_envs.panda_push_gym_env_HER import pandaPushGymEnvHER
+from envs.panda_envs.panda_push_gym_env_HER_Dynamics_Randomization import pandaPushGymEnvHERRand
 import robot_data
 
 model_class = DDPG  # works also with SAC and DDPG
 
 # -j
 
-action_space = 7
+numControlledJoints = 7
 # -p
 fixed = True
 # -o
@@ -29,23 +29,22 @@ memory_limit = 1000000
 # -r
 normalize_returns = True
 # -t
-timesteps = 100000
+timesteps = 10000000
 policy_name = "pushing_policy"
 discreteAction = 0
 rend = True
 
-env = pandaPushGymEnvHER(urdfRoot=robot_data.getDataPath(), renders=rend, useIK=0,
-        isDiscrete=discreteAction, action_space = action_space,
-        fixedPositionObj = fixed, includeVelObs = True, object_position=0, test_phase = True)
+env = pandaPushGymEnvHERRand(urdfRoot=robot_data.getDataPath(), renders=rend, useIK=0,
+        isDiscrete=discreteAction, numControlledJoints = numControlledJoints,
+        fixedPositionObj = fixed, includeVelObs = True)
 
-goal_selection_strategy = 'future' # equivalent to GoalSelectionStrategy.FUTURE
 # Wrap the model
-model = HER.load("../policies/pushing_DDPG_HER_PHASE_1best_model.pkl", env=env)
+model = HER.load("../policies/pushing_fixed_HER_Dyn_Rand0.pkl", env=env)
 
 obs = env.reset()
 
-for _ in range(10000):
+for i in range(10000):
     action, _ = model.predict(obs)
     obs, reward, done, _ = env.step(action)
-    if done:
+    if done or i == 500 :
         obs = env.reset()

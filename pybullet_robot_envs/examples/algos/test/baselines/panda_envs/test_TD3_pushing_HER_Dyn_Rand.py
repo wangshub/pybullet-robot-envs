@@ -6,9 +6,10 @@ os.sys.path.insert(0, parentdir)
 print(parentdir)
 
 
-from stable_baselines import HER, DQN, SAC, DDPG
+from stable_baselines import HER, DQN, SAC, DDPG, TD3
+
 from stable_baselines.her import GoalSelectionStrategy, HERGoalEnvWrapper
-from envs.panda_envs.panda_push_gym_env_HER import pandaPushGymEnvHER
+from envs.panda_envs.panda_push_gym_env_HER_Dynamics_Randomization import pandaPushGymEnvHERRand
 import robot_data
 
 model_class = DDPG  # works also with SAC and DDPG
@@ -29,18 +30,18 @@ memory_limit = 1000000
 # -r
 normalize_returns = True
 # -t
-timesteps = 100000
+timesteps = 1000000
 policy_name = "pushing_policy"
 discreteAction = 0
 rend = True
 
-env = pandaPushGymEnvHER(urdfRoot=robot_data.getDataPath(), renders=rend, useIK=0,
+env = pandaPushGymEnvHERRand(urdfRoot=robot_data.getDataPath(), renders=rend, useIK=0,
         isDiscrete=discreteAction, action_space = action_space,
-        fixedPositionObj = fixed, includeVelObs = True, object_position=0, test_phase = True)
+        fixedPositionObj = fixed, includeVelObs = True, object_position=0, test_phase = True, alg = 'td3_normal_policy_to_different_physics', type_physics=2, max_episode_steps=500)
 
 goal_selection_strategy = 'future' # equivalent to GoalSelectionStrategy.FUTURE
 # Wrap the model
-model = HER.load("../policies/pushing_DDPG_HER_PHASE_1best_model.pkl", env=env)
+model = HER.load("../policies/USEFUL_POLICIES/PUSHING_TD3+HER_FIXED_POSITIONbest_model.pkl", env=env)
 
 obs = env.reset()
 

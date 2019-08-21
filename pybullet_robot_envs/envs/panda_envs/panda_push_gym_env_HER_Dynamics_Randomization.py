@@ -34,7 +34,7 @@ def goal_distance(goal_a, goal_b):
 
 
 #inherit from different class
-class pandaPushGymEnvHER(gym.GoalEnv):
+class pandaPushGymEnvHERRand(gym.GoalEnv):
 
     metadata = {'render.modes': ['human', 'rgb_array'],
     'video.frames_per_second': 50 }
@@ -53,12 +53,13 @@ class pandaPushGymEnvHER(gym.GoalEnv):
                  test_phase = False,
                  alg = 'ddpg' ,
                  max_episode_steps = 1000,
-                 keep_fixed_position = False):
+                 type_physics = 0):
 
         self.object_position = object_position
         self.action_dim = action_space
         self._isDiscrete = isDiscrete
-        self._timeStep = 1./240.
+        self._param_lambda = 1/np.random.uniform(125,1000)
+        self._timeStep = (1.0/240.0) + np.random.exponential(self._param_lambda)
         self._useIK = useIK
         self._urdfRoot = urdfRoot
         self._actionRepeat = actionRepeat
@@ -78,10 +79,7 @@ class pandaPushGymEnvHER(gym.GoalEnv):
         self.test_phase = test_phase
         self.alg = alg
         self.max_episode_steps = max_episode_steps
-        self.keep_fixed_position = keep_fixed_position
-        self.ep_counter = -1
-        self.obj_pose = [np.random.uniform(0.5,0.6),np.random.uniform(0,0.1),0.64]
-        self.target_pose = [np.random.uniform(0.4,0.5),np.random.uniform(0.45,0.55),0.64]
+        self.type_physics = type_physics
 
 
         if self._renders:
@@ -134,11 +132,12 @@ class pandaPushGymEnvHER(gym.GoalEnv):
                 test_steps = 0
 
 
+
         p.resetSimulation()
         p.setPhysicsEngineParameter(numSolverIterations=150)
         p.setTimeStep(self._timeStep)
         self._envStepCounter = 0
-        self.ep_counter = self.ep_counter + 1
+
         p.loadURDF(os.path.join(pybullet_data.getDataPath(),"plane.urdf"), useFixedBase= True)
         # Load robot
         self._panda = pandaEnv(self._urdfRoot, timeStep=self._timeStep, basePosition =[0,0,0.625],
@@ -166,19 +165,15 @@ class pandaPushGymEnvHER(gym.GoalEnv):
                 self._targetID = p.loadURDF(os.path.join(self._urdfRoot, "franka_description/domino/domino.urdf"), basePosition= self.target_pose)
 
             elif(self.object_position==1):
-                if (self.keep_fixed_position):
-                    if (self.ep_counter == 100):
-                        self.obj_pose = [np.random.uniform(0.5,0.6),np.random.uniform(0,0.1),0.64]
-                        self.target_pose = [np.random.uniform(0.4,0.5),np.random.uniform(0.45,0.55),0.64]
-                        self.ep_counter = -1
-                else:
-                    self.obj_pose = [np.random.uniform(0.5,0.6),np.random.uniform(0,0.1),0.64]
-                    self.target_pose = self.target_pose = [0.4,0.45,0.64]
-                #self.target_pose = [np.random.uniform(0.4,0.5),np.random.uniform(0.45,0.55),0.64]
+                #we have completely fixed position
+                self.obj_pose = [np.random.uniform(0.5,0.6),np.random.uniform(0,0.1),0.64]
+                self.target_pose = [0.4,0.45,0.64]
+                # self.target_pose = [np.random.uniform(0.4,0.5),np.random.uniform(0.45,0.55),0.64]
                 self._objID = p.loadURDF( os.path.join(self._urdfRoot,"franka_description/cube_small.urdf"), basePosition = self.obj_pose)
                 self._targetID = p.loadURDF(os.path.join(self._urdfRoot, "franka_description/domino/domino.urdf"), basePosition= self.target_pose)
 
             elif(self.object_position==2):
+                #we have completely fixed position
                 self.obj_pose = [np.random.uniform(0.4,0.6),np.random.uniform(0,0.2),0.64]
                 self.target_pose = [np.random.uniform(0.3,0.5),np.random.uniform(0.35,0.55),0.64]
                 self._objID = p.loadURDF( os.path.join(self._urdfRoot,"franka_description/cube_small.urdf"), basePosition = self.obj_pose)
@@ -193,6 +188,30 @@ class pandaPushGymEnvHER(gym.GoalEnv):
             self._targetID = p.loadURDF(os.path.join(self._urdfRoot, "franka_description/domino/domino.urdf"), basePosition= self.target_pose)
 
 
+
+        if self.type_physics==1:
+            # Randomizing the physics of the object...
+            self.currentMass = np.random.uniform(0.1,0.8)
+            self.currentFriction = np.random.uniform(0.1,0.7)
+            self.currentDamping = np.random.uniform(0.01,0.2)
+            p.changeDynamics(self._objID, linkIndex=-1, mass=self.currentMass, lateralFriction=self.currentFriction,
+                            linearDamping=self.currentDamping)
+
+            # Randomizing the physics of the robot... (only joints damping and controller gains)
+            for i in range(7):
+                p.changeDynamics(self._panda.pandaId, linkIndex=i, linearDamping=np.random.uniform(0.25,20))
+
+        elif self.type_physics==2:
+            # Randomizing the physics of the object...
+            self.currentMass = 0.8
+            self.currentFriction = 0.2
+            self.currentDamping = 0.2
+            p.changeDynamics(self._objID, linkIndex=-1, mass=self.currentMass, lateralFriction=self.currentFriction,
+                            linearDamping=self.currentDamping)
+
+            # Randomizing the physics of the robot... (only joints damping and controller gains)
+            for i in range(7):
+                p.changeDynamics(self._panda.pandaId, linkIndex=i, linearDamping= 0.25)
 
         self._debugGUI()
         p.setGravity(0,0,-9.8)
@@ -338,7 +357,7 @@ class pandaPushGymEnvHER(gym.GoalEnv):
     def save_data_test(self):
 
         global test_steps, test_done
-        row = [test_steps, test_done]
+        row = [test_steps, test_done, self.currentMass, self.currentFriction , self.currentDamping, self._timeStep]
         with open('test_panda_push_'+ self.alg+'.csv', 'a') as csvFile:
             writer = csv.writer(csvFile)
             writer.writerow(row)
